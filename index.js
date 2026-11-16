@@ -1,3 +1,4 @@
+
 import TelegramBot from "node-telegram-bot-api";
 
 const token = process.env.BOT_TOKEN;
@@ -7,11 +8,10 @@ if (!token) {
 }
 
 const bot = new TelegramBot(token, { polling: true });
+const waitingForToken = new Set();
 
 bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-
-  bot.sendMessage(chatId, "🇬🇪 მოგესალმები GeoBot-ში!", {
+  bot.sendMessage(msg.chat.id, "🇬🇪 მოგესალმები GeoBot-ში!", {
     reply_markup: {
       keyboard: [
         ["➕ ჩემი ბოტის დამატება"],
@@ -24,25 +24,53 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-bot.on("message", (msg) => {
+bot.on("message", async (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
 
+  if (!text || text.startsWith("/")) return;
+
   if (text === "➕ ჩემი ბოტის დამატება") {
-    bot.sendMessage(chatId, "🤖 გამოგზავნე შენი ბოტის Token.");
+    waitingForToken.add(chatId);
+    return bot.sendMessage(
+      chatId,
+      "🤖 გამოგზავნე იმ ბოტის API Token, რომლის შემოწმებაც გინდა."
+    );
   }
 
   if (text === "🤖 ჩემი ბოტები") {
-    bot.sendMessage(chatId, "შენი დამატებული ბოტები აქ გამოჩნდება.");
+    return bot.sendMessage(chatId, "შენახული ბოტები ჯერ არ გაქვს.");
   }
 
   if (text === "⚙️ პარამეტრები") {
-    bot.sendMessage(chatId, "პარამეტრები მალე დაემატება.");
+    return bot.sendMessage(chatId, "პარამეტრები მალე დაემატება.");
   }
 
   if (text === "ℹ️ დახმარება") {
-    bot.sendMessage(chatId, "GeoBot დაგეხმარება Telegram ბოტების მართვაში.");
+    return bot.sendMessage(chatId, "GeoBot დაგეხმარება Telegram ბოტების მართვაში.");
+  }
+
+  if (waitingForToken.has(chatId)) {
+    waitingForToken.delete(chatId);
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${text}/getMe`
+      );
+      const data = await response.json();
+
+      if (!data.ok) {
+        return bot.sendMessage(chatId, "❌ Token არასწორია. გადაამოწმე და სცადე თავიდან.");
+      }
+
+      return bot.sendMessage(
+        chatId,
+        `✅ Token სწორია!\n\nბოტის სახელი: ${data.result.first_name}\nUsername: @${data.result.username}\n\nშემდეგ ეტაპზე დავამატებთ მის შენახვასა და მართვას.`
+      );
+    } catch (error) {
+      return bot.sendMessage(chatId, "⚠️ შემოწმება ვერ მოხერხდა. სცადე მოგვიანებით.");
+    }
   }
 });
 
-console.log("GeoBot მუშაობს!");
+console.log("🇬🇪 GeoBot მუშაობს!");
